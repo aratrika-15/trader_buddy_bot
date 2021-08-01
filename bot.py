@@ -85,7 +85,7 @@ def get_trending_stocks(message):
             continue
         url=basic_url+i.upper()
         response = requests.request("GET", url, headers=headers)
-        print(response.text)
+        #print(response.text)
         response=json.loads(response.text)
        
         trending_stocks=response["finance"]["result"][0]["quotes"][0:5]
@@ -99,6 +99,40 @@ def get_trending_stocks(message):
         return_text='\n\n'.join(region_string)
     bot.send_message(message.chat.id,return_text)
 
+
+# recommend stocks which are similar to another stock
+def recommendation_request(message):
+    request=message.text.split(' ')
+    if len(request)<2 or request[0].lower() not in "recommend":
+        return False
+    else:
+        return True
+
+@bot.message_handler(func=recommendation_request)
+def recommend_stocks(message):
+    reference_stocks=message.text.split(' ')[1:]
+    if(len(reference_stocks)>1):
+        bot.send_message(message.chat.id,"Please send one stock name at a time to get recommendations")
+    else:
+        basic_url='https://yfapi.net/v6/finance/recommendationsbysymbol/'
+        url=basic_url+reference_stocks[0].upper()
+        headers = {
+        'x-api-key': YAHOO_API_KEY
+        }
+        response = requests.request("GET", url, headers=headers)
+        response=json.loads(response.text)
+        if(len(response["finance"]["result"])>0):
+            recommendations=response["finance"]["result"][0]["recommendedSymbols"]
+            recommended_stocks=[]
+            count=1
+            for i in recommendations:
+                recommended_stocks.append((str(count)+".  "+i["symbol"]+" similar by "+str(i["score"])))
+                count+=1
+            recommended='\n'.join(recommended_stocks)
+            return_text="Stocks similar to "+reference_stocks[0]+":\n"+recommended
+            bot.send_message(message.chat.id,return_text)
+        else:
+            bot.send_message(message.chat.id,"Are you sure you provided the correct stock symbol? Check and try again.")
 
 
 bot.polling()
