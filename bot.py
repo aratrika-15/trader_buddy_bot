@@ -4,6 +4,7 @@ import os
 import json
 from dotenv import load_dotenv
 import requests
+import matplotlib.pyplot as plt
 
 
 load_dotenv()
@@ -35,7 +36,7 @@ def get_quote(message):
     #function to return the daily high, daily low, and the daily range
     stocks=message.text.split(' ')[1:]
     requested_stocks=','.join(i.upper() for i in stocks)
-    print(requested_stocks)
+    #print(requested_stocks)
     url = "https://rest.yahoofinanceapi.com/v6/finance/quote"
 
     querystring = {"symbols":requested_stocks}
@@ -54,7 +55,7 @@ def get_quote(message):
         market_price_range='\n\n\n'.join(market_price_ranges)
         bot.send_message(message.chat.id,market_price_range)
     else:
-        bot.send_message(message.chat.id, "Data related to these stocks weren't found. Check them again?")
+        bot.send_message(message.chat.id, "Are you sure you provided the correct stock symbols? Please check and try again.")
 
 
 
@@ -133,6 +134,53 @@ def recommend_stocks(message):
             bot.send_message(message.chat.id,return_text)
         else:
             bot.send_message(message.chat.id,"Are you sure you provided the correct stock symbol? Check and try again.")
+
+#return historical stock prices
+def history_request(message):
+    request=message.text.split(' ')
+    if len(request)<2 or request[0].lower() not in "history":
+        return False
+    else:
+        return True
+
+@bot.message_handler(func=history_request)
+def history_request(message):
+    stocks=message.text.split(' ')[1:]
+    url='https://yfapi.net/v8/finance/spark'
+    querystring = {"symbols": ','.join(stocks),
+                    "interval":"1d",
+                    "range":"1mo"
+                    }
+
+    headers = {
+    'x-api-key': YAHOO_API_KEY
+    }
+    response = requests.request("GET", url, headers=headers, params=querystring)
+    #print(response.text)
+    response=json.loads(response.text)
+    price_null=False
+    if "spark" in response.keys():
+        bot.send_message(message.chat.id,"Sorry these stock symbols don't seem right. Check and try again.")
+    else:
+        for stock in response.keys():
+            stocks_present=True
+            price_history=response[stock]["close"]
+            if(price_history!=None):
+                plt.plot(price_history, label=stock)
+            else:
+                price_null=True
+            
+        
+        if(price_null==False):
+            plt.legend()
+            plt.xlabel("Last month")
+            plt.ylabel("Daily closing price")
+            plt.savefig('prices_plot.png', dpi=300, bbox_inches='tight')
+            photo = open('prices_plot.png', 'rb')
+            bot.send_photo(message.chat.id, photo)
+        else:
+            bot.send_message(message.chat.id, "Some of those stocks don't have price data available. Please check and try again.")
+
 
 
 bot.polling()
